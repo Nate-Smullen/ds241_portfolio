@@ -1,0 +1,52 @@
+---
+title: "MA131 and MA132 Enrollment Prediction"
+author: "Nate Smullen"
+date: "10/3/2022"
+output: html_notebook
+---
+
+Class play with MA131 and MA132 enrollment data.
+
+##Load Packages
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+```
+
+##Load Enrollment Data
+
+```{r}
+thisfile=here("data_raw","CU_ACAD_DEPT_WHEN_OFF_ENRL_22740.csv")
+
+df1=read_csv(thisfile) %>% clean_names()
+
+```
+
+```{r}
+df2 <- aggregate(df1$tot_enrl, list(df1$term_8, df1$title), sum)
+colnames(df2) <- c("term", "course_title", "tot_students_enrolled")
+
+df2 %>% ggplot(aes(fill=course_title, x=term, y=tot_students_enrolled)) + 
+    geom_bar(position="dodge", stat="identity")
+
+```
+
+Above plot has the correct labels but it is not sorted by time because of the
+alphabetical sort. We do not know how to order it correctly, but the labels
+on the X axis are what we want.
+
+```{r}
+df2 <- aggregate(df1$tot_enrl, list(df1$term_7, df1$title), sum)
+colnames(df2) <- c("term", "course_title", "tot_students_enrolled")
+
+df2 %>% ggplot(aes(fill=course_title, x=term, y=tot_students_enrolled)) + 
+    geom_bar(position="dodge", stat="identity")
+
+```
+
+Above plot has the correct order, as it is sorted from oldest to newest, however
+it is very difficult to read which section is which. Ideally, a mix between
+this plot and the previous plot is what we are aiming for, but we do not yet
+know how to do it.

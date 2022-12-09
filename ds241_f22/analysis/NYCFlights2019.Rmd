@@ -1,0 +1,81 @@
+---
+title: "NYC Flights"
+author: "Nate Smullen"
+date: "2022-09-14"
+output: html_notebook
+---
+
+Homework
+
+## Load Packages
+
+```{r}
+library(nycflights13)
+library(tidyverse)
+library(here)
+library(janitor)
+```
+
+## Load Flight Data
+
+```{r}
+thisfile=here("data_raw","DL_SelectFields.zip")
+
+df2019=read_csv(thisfile) %>% clean_names()
+```
+# Filter by flights with at least one passenger from LGA
+
+```{r}
+df9 = df2019 %>% filter(passengers > 0,origin=="LGA")
+```
+
+```{r}
+df9 %>% ggplot(aes(month)) + geom_bar(aes(weight=departures_performed))
+```
+
+```{r}
+df9 %>% ggplot(aes(month)) + geom_bar(aes(weight=passengers))
+```
+               
+```{r}
+df9 %>% ggplot(aes(month,fill=carrier_name)) + geom_bar(aes(weight=departures_performed))
+```
+```{r}
+df10 = df2019 %>% filter(passengers > 0, origin == "LGA" | dest == "LGA")
+
+df10 %>% ggplot(aes(month)) + geom_bar(aes(weight = passengers))
+```
+
+```{r}
+df11 = df10 %>% select(month, passengers, seats, carrier_name, dest, origin)
+
+df13 = df11 %>% mutate(percent_loading = 100 * passengers/seats)
+```
+
+```{r}
+# df13 %>% ggplot(aes(percent_loading) + geom_histogram(aes(weight = passengers))
+```
+
+### Summarize data
+
+```{r}
+df15_1 = df2019 %>% filter(passengers > 0, origin == "LGA" | dest == "LGA") %>% 
+  group_by(month, carrier_name) %>% summarise(total_pass = sum(passengers), num_flights = sum(departures_performed)) %>%
+  mutate(average_pass_per_flight = total_pass / num_flights)
+
+df15_1
+df15_1 %>% ggplot(aes(x = month, y = average_pass_per_flight, color = carrier_name)) + geom_line()
+```
+Insights from above plot:
+*Appears to be 
+
+```{r}
+df15_2 = df2019 %>% filter(passengers > 0, origin == "LGA" | dest == "LGA") %>% 
+  group_by(month, carrier_name) %>% summarise(total_seats = sum(seats), num_flights = sum(departures_performed)) %>%
+  mutate(average_seats_per_flight = total_seats / num_flights)
+
+df15_2
+df15_2 %>% ggplot(aes(x = month, y = average_seats_per_flight, color = carrier_name)) + geom_line()
+```
+
+

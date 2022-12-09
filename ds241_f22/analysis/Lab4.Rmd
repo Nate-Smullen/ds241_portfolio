@@ -1,0 +1,144 @@
+---
+title: "Lab 4: Spatial Data with Denny's and La Quinta"
+author: "Nate Smullen"
+date: "10/16/2022"
+output: html_notebook
+---
+
+Visualizing spatial data
+
+##Load Packages
+
+```{r}
+library(tidyverse)
+library(dsbox)
+```
+
+##Load States Data
+
+```{r}
+states <- read_csv("states.csv")
+```
+
+1.
+```{r}
+nrow(dennys)
+ncol(dennys)
+names(dennys)
+```
+There are 1643 rows in the Denny's dataset, each representing a different 
+Denny's restaurant. There are 6 columns in the Denny's dataset, each 
+representing a different attribute. The attributes are address, city, state, zip
+code, longitude, and latitude.
+
+2.
+```{r}
+nrow(laquinta)
+ncol(laquinta)
+names(laquinta)
+```
+There are 909 rows in the LaQuinta's dataset, each representing a different 
+LaQuinta's motel. There are 6 columns in the LaQuinta's dataset, each 
+representing a different attribute. The attributes are address, city, state, zip
+code, longitude, and latitude.
+
+3. There are several LaQuinta's locations outside of the US. There are some in 
+Canada, Mexico, China, New Zealand, Turkey, United Arab Emirates, Chile, and 
+Columbia. There are no Denny's locations listed on the website that are outside
+of the US.
+
+4. The locations outside of the US still have a value in the state column, so 
+you cannot filter by null values in that column. You could check to make sure
+each state is actually a state in the US, however the state abbreviation for a
+location in a different country may be the same as one in the US. Instead,
+you could try to filter by zip codes that are in the US. Zip codes, however, are
+not unique globally, so you could run into the issue where a foreign zip code
+matches one in the US. Therefore, the safest way to determine if a state is in
+the US is to filter based on combinations of longitudes and latitudes that are
+inside of the US.
+
+5.
+```{r}
+dennys %>%
+  filter(!(state %in% states$abbreviation))
+```
+The Denny's dataset filtered by states not in the US is empty, meaning there
+are no locations outside of the US.
+
+6.
+```{r}
+dennys <- dennys %>%
+  mutate(country = "United States")
+```
+
+7.
+```{r}
+laquinta %>%
+  filter(!(state %in% states$abbreviation))
+```
+* ON, BC are in Canada
+* ANT is in Colombia
+* Ag, QR, Ch, NL, VE, PU, SL are in Mexico
+* FM is in Honduras
+
+8.
+```{r}
+laquinta <- laquinta %>%
+  mutate(country = case_when(
+    state %in% state.abb     ~ "United States",
+    state %in% c("ON", "BC") ~ "Canada",
+    state == "ANT"           ~ "Colombia",
+    state %in% c("AG" ,"QR","CH","NL","VE","PU","SL") ~ "Mexico",
+    state == "FM"            ~ "Honduras"))
+```
+```{r}
+laquinta <- laquinta %>%
+  filter(country == "United States")
+```
+
+9.
+```{r}
+dennys %>%
+  count(state) %>%
+  inner_join(states, by = c("state" = "abbreviation"))
+```
+
+10.
+```{r}
+dennys <- dennys %>%
+  mutate(establishment = "Denny's")
+laquinta <- laquinta %>%
+  mutate(establishment = "La Quinta")
+```
+```{r}
+dn_lq <- bind_rows(dennys, laquinta)
+```
+```{r}
+ggplot(dn_lq, mapping = aes(x = longitude, y = latitude, color = establishment)) +
+  geom_point(alpha = .5)
+```
+11.
+```{r}
+dn_lq_nc = dn_lq %>% filter(state == "NC")
+
+ggplot(dn_lq_nc, mapping = aes(x = longitude, y = latitude, color = establishment)) +
+  geom_point(alpha = .5)
+```
+Visually, Mitch Hedberg's joke does not hold in North Carolina
+
+
+12.
+```{r}
+dn_lq_nc = dn_lq %>% filter(state == "TX")
+
+ggplot(dn_lq_nc, mapping = aes(x = longitude, y = latitude, color = establishment)) +
+  geom_point(alpha = .5)
+```
+Visually, Mitch Hedberg's joke holds in Texas.
+
+
+
+
+
+
+

@@ -1,0 +1,221 @@
+---
+title: "Bikeshare Data"
+author: "Nate Smullen"
+date: "10/27/2022"
+output: html_notebook
+---
+
+Bike Share Data
+
+##Load Packages
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(maps)
+library(lubridate)
+library(gbfs)
+
+library(taskscheduleR) #might be useful for running code every minute
+```
+
+##Load Bikeshare Data
+
+```{r}
+thisfile=here("data_raw","202209-capitalbikeshare-tripdata.csv")
+
+bike = read_csv(thisfile) %>% clean_names() %>%
+  na.omit(bike)
+```
+
+```{r}
+DC <- map_data("state") %>% filter(region=="district of columbia")
+```
+
+```{r}
+ggplot(bike, mapping = aes(x=start_lng, y=start_lat)) +
+  geom_polygon(data = DC, aes(x=long, y = lat, group = group), fill="grey", alpha=0.3) +
+  geom_point(alpha = .01)
+```
+
+```{r}
+bikea = bike %>% mutate(duration = as.numeric((ended_at - started_at)/60),
+                        hour_of_day=hour(started_at),
+                        day_of_week=wday(started_at,label = T))
+```
+
+```{r}
+bikea %>% filter(duration < 100, duration > 0) %>%
+  ggplot(mapping = aes(duration)) +
+         geom_histogram(bins = 300) + facet_wrap(~day_of_week)
+```
+
+```{r}
+bikeb = bikea %>% filter(duration >0)
+```
+
+```{r}
+bikec = bikeb %>% filter(mday(started_at) == 3) %>% slice_sample(n = 100)
+```
+
+```{r}
+bikec %>% select(start = started_at, end = ended_at)
+```
+Make it a long dataset
+```{r}
+bikec %>% select(start = started_at, end = ended_at) %>%
+  pivot_longer(start:end)
+```
+
+pick namges and order by time
+
+```{r}
+bikec %>% select(start = started_at, end = ended_at) %>%
+  pivot_longer(start:end, names_to = "type", values_to = "time") %>% 
+  arrange(time)
+```
+add counter
+```{r}
+bikec %>% select(start = started_at, end = ended_at) %>%
+  pivot_longer(start:end, names_to = "type", values_to = "time") %>% 
+  arrange(time) %>% 
+  mutate(increment = case_when(
+    type == "start" ~ 1,
+    type == "end" ~ -1
+  ))
+```
+cumulative sum for that column
+```{r}
+bikec %>% select(start = started_at, end = ended_at) %>%
+  pivot_longer(start:end, names_to = "type", values_to = "time") %>% 
+  arrange(time) %>% 
+  mutate(increment = case_when(
+    type == "start" ~ 1,
+    type == "end" ~ -1
+  )) %>%
+  mutate(riders = cumsum(increment))
+```
+```{r}
+bikec %>% select(start = started_at, end = ended_at) %>%
+  pivot_longer(start:end, names_to = "type", values_to = "time") %>% 
+  arrange(time) %>% 
+  mutate(increment = case_when(
+    type == "start" ~ 1,
+    type == "end" ~ -1
+  )) %>%
+  mutate(riders = cumsum(increment)) %>%
+  ggplot(aes(time, riders)) + geom_step()
+```
+Do it with the whole dataset at september 3
+```{r}
+bikeb %>% filter(mday(started_at) == 3) %>%
+  select(start = started_at, end = ended_at) %>%
+  pivot_longer(start:end, names_to = "type", values_to = "time") %>% 
+  arrange(time) %>% 
+  mutate(increment = case_when(
+    type == "start" ~ 1,
+    type == "end" ~ -1
+  )) %>%
+  mutate(riders = cumsum(increment)) %>%
+  ggplot(aes(time, riders)) + geom_step() +
+  scale_x_datetime(limits = as_datetime(c("2022-09-03", "2022-09-04")))
+```
+Facet the daily graphs for the whole month to see the whole dataset
+```{r}
+bikeb %>% filter(month(started_at) == 9, month(ended_at) == 9) %>%
+  select(start = started_at, end = ended_at) %>%
+  pivot_longer(start:end, names_to = "type", values_to = "time") %>% 
+  arrange(time) %>% 
+  mutate(increment = case_when(
+    type == "start" ~ 1,
+    type == "end" ~ -1
+  )) %>%
+  mutate(riders = cumsum(increment)) %>%
+  ggplot(aes(time, riders)) + geom_step() +
+  facet_wrap(~mday(time), scales = "free_x", ncol = 7)
+```
+*During the weekdays, there are 2 peaks in number of riders, vs weekends having
+  one peak
+*For weekdays, there are more people riding during the afternoon peak than
+  during the morning peak
+*September 5 is a weekday that only 1 peak, but it was labor day, so many people
+  did not have to go to work/school.
+*Fridays typically increases throughout the day, making the the first peak less
+  defined
+*There was a storm that hit DC on the 11th and 12th, likely causing the decrease
+  in number of riders that day
+*The 30th had some rain in the evening, perhaps explaining the decrease in the
+  number of riders for the second peak
+
+
+Compare casual riders to members
+```{r}
+bikeb %>%
+  filter(month(started_at)==9,month(ended_at)==9) %>%
+select(member_casual,start=started_at,end=ended_at) %>%
+  pivot_longer(start:end, names_to="type",values_to="time") %>% arrange(time) %>%
+  mutate(increment=case_when(
+   type=="start"~1,
+   type=="end" ~ -1
+  )) %>%
+  group_by(member_casual) %>%
+  mutate(riders=cumsum(increment)) %>%
+    ggplot(aes(time,riders,color=member_casual)) + geom_step() +
+  facet_wrap(~mday(time),scales = "free_x",ncol = 7)
+```
+```{r}
+bikeb %>% filter(duration < 100) %>%
+  group_by(member_casual) %>%
+  ggplot(aes(x = duration, color = member_casual)) + geom_histogram(bins = 300) +
+  facet_wrap(~day_of_week)
+```
+
+```{r fig.height = 10}
+bikeb %>% filter(duration < 100) %>%
+  ggplot(aes(x = duration)) + geom_histogram(bins = 300) +
+  facet_wrap(~hour(started_at), scales = 'free_y', ncol = 6)
+```
+
+```{r}
+df_cities = get_gbfs_cities()
+```
+
+
+```{r}
+station_info <- get_station_information("cabi")
+free_bikes <- get_free_bike_status("cabi")
+station_status <- get_station_status("cabi")
+```
+Next Question:
+How close does it get to no bikes being available in some locations?
+
+See live data, run code with a timer, pick 3 or 4 that are close to running out
+Check every minute during rush hours
+
+```{r}
+station_status <- get_station_status("cabi") %>% 
+  mutate(total_bikes_available = 
+  num_bikes_available + num_docks_available + num_ebikes_available)
+```
+
+```{r}
+free_bikes %>% ggplot(aes(x = lon, y = lat)) +  
+  geom_polygon(data = DC, aes(x=long, y = lat, group = group), fill="grey", alpha=0.3) +
+  geom_point()
+```
+
+
+```{r}
+#code that runs every minute for an hour
+#problem with this code is that it doesn't account for the time it takes to do 
+#The calculation
+i = 0
+while(i < 60) {
+  print(paste("its been", i, "minutes since this started, give or take a bit"))
+  i = i + 1
+  
+  Sys.sleep(60)
+}
+```
+
